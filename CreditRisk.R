@@ -1,5 +1,5 @@
 
-setwd("/Users/Sooyoung/kaggle/CreditRisk/")
+setwd("/Users/Sooyoung/kaggle/CreditRisk/data")
 
 # library(dplyr)
 # library(data.table)
@@ -23,6 +23,8 @@ setwd("/Users/Sooyoung/kaggle/CreditRisk/")
 library(tidyverse)
 library(xgboost)
 library(magrittr)
+library("Ckmeans.1d.dp")
+
 set.seed(0)
 
 #---------------------------
@@ -106,8 +108,8 @@ system.time(
     currentEta <- parameterList[["eta"]]
     currentMinChild <- parameterList[["min_child"]]
     xgboostModelCV <- xgb.cv(data =  X, nrounds = ntrees, nfold = 2, showsd = TRUE, 
-                             metrics = "logloss", verbose = TRUE, "eval_metric" = "logloss",
-                             "objective" = "reg:logistic", "max.depth" = currentDepth, "eta" = currentEta,                               
+                             metrics = "auc", verbose = TRUE, "eval_metric" = "auc",
+                             "objective" = "binary:logistic", "max.depth" = currentDepth, "eta" = currentEta,                               
                              "subsample" = currentSubsampleRate, "colsample_bytree" = currentColsampleRate
                              , print_every_n = 10, "min_child_weight" = currentMinChild, booster = "gbtree",
                              early_stopping_rounds = 10)
@@ -121,14 +123,14 @@ system.time(
 
 output <- as.data.frame(t(loglossErrorsHyperparameters))
 head(output)
-varnames <- c("Testlogloss", "Trainlogloss", "SubSampRate", "ColSampRate", "Depth", "eta", "currentMinChild")
+varnames <- c("Testlogloss", "auc", "SubSampRate", "ColSampRate", "Depth", "eta", "currentMinChild")
 names(output) <- varnames
 head(output)
 
 
-p <- list(objective = "reg:logistic",
+p <- list(objective = "binary:logistic",
           booster = "gbtree",
-          eval_metric = "logloss",
+          eval_metric = "auc",
           nthread = 8,
           eta = 0.20,
           max_depth = 10,
@@ -140,16 +142,16 @@ p <- list(objective = "reg:logistic",
           lambda = 0,
           nrounds = 4000)
 
-m_xgb <- xgb.train(p, dtrain, p$nrounds, list(val = dval), print_every_n = 50, early_stopping_rounds = 100)
+m_xgb <- xgb.train(p, dtrain, p$nrounds, list(val = dval), print_every_n = 50, early_stopping_rounds = 200)
 
 xgb.importance(cols, model=m_xgb) %>% 
   xgb.plot.importance(top_n = 30)
 
 #---------------------------
-read_csv("../input/sample_submission.csv") %>%  
+read_csv("sample_submission.csv") %>%  
   mutate(SK_ID_CURR = as.integer(SK_ID_CURR),
          TARGET = predict(m_xgb, dtest)) %>%
-  write_csv(paste0("tidy_xgb_", round(m_xgb$best_score, 5), ".csv"))
+  write_csv(paste0("tidy_xgb_2", round(m_xgb$best_score, 5), ".csv"))
 
 
 
